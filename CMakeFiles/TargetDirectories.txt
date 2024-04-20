@@ -1,4 +1,0 @@
-/Users/daniilzolin/Desktop/MyRepository/labs-zolin/hw-02_huffman/CMakeFiles/hw-02_huffman_test.dir
-/Users/daniilzolin/Desktop/MyRepository/labs-zolin/hw-02_huffman/CMakeFiles/hw-02_huffman.dir
-/Users/daniilzolin/Desktop/MyRepository/labs-zolin/hw-02_huffman/CMakeFiles/edit_cache.dir
-/Users/daniilzolin/Desktop/MyRepository/labs-zolin/hw-02_huffman/CMakeFiles/rebuild_cache.dir
