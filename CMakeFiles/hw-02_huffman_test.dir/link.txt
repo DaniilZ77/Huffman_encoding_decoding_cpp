@@ -1,0 +1,1 @@
+/usr/bin/c++  -Wall -g -std=c++20 "CMakeFiles/hw-02_huffman_test.dir/src/huffman_archiver.cpp.o" "CMakeFiles/hw-02_huffman_test.dir/src/huffman_tree_node.cpp.o" "CMakeFiles/hw-02_huffman_test.dir/src/huffman_tree.cpp.o" "CMakeFiles/hw-02_huffman_test.dir/test/test.cpp.o" -o hw-02_huffman_test 
