@@ -16,7 +16,16 @@ int main(int argc, char *argv[])
     {
         std::ifstream in(argv[3]);
         std::string text;
-        getline(in, text);
+
+        while (true)
+        {
+            char byte;
+            in.read(&byte, sizeof(byte));
+            if (in.eof() || in.fail())
+                break;
+            text.push_back(byte);
+        }
+
         in.close();
 
         ha ha(text);
@@ -46,6 +55,6 @@ int main(int argc, char *argv[])
         std::cout << ha.get_amount_of_codes_bytes() << std::endl;
 
         std::ofstream out(argv[5]);
-        out << ha.get_bytes() + "\n";
+        out << ha.get_bytes();
     }
 }
