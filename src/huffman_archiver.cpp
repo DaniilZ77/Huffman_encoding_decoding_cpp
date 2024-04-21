@@ -10,6 +10,7 @@ namespace huffman_archiver
     const char ON = '1';
     const char OFF = '0';
     const std::size_t BYTE_LEN = 8;
+
     huffman_archiver::huffman_archiver(std::string text) : _bytes(std::vector<uint8_t>(text.begin(), text.end())), _tree(nullptr), _bytes_size(text.size()) {}
 
     std::string huffman_archiver::get_bytes()
@@ -32,20 +33,20 @@ namespace huffman_archiver
         return bytes;
     }
 
-    std::ofstream &
-    operator<<(std::ofstream &out, huffman_archiver &archiver)
+    std::ofstream &operator<<(std::ofstream &out, huffman_archiver &archiver)
     {
         out.write(reinterpret_cast<char *>(&archiver._bytes_size), sizeof(archiver._bytes_size));
         uint8_t codes_size = archiver._codes.size();
         out.write(reinterpret_cast<char *>(&codes_size), sizeof(codes_size));
         std::for_each(archiver._codes.begin(), archiver._codes.end(), [&](auto &code)
                       {
-            uint8_t code_value = code.first;
-            out.write(reinterpret_cast<char *>(&code_value), sizeof(code_value));
+            char code_value = code.first;
+            out.write(&code_value, sizeof(code_value));
 
-            uint8_t code_size = code.second.size();
-            out.write(reinterpret_cast<char *>(&code_size), sizeof(code_size));
+            char code_size = code.second.size();
+            out.write(&code_size, sizeof(code_size));
             out.write(code.second.c_str(), code_size); });
+
         std::string bytes_str = archiver.get_bytes();
         out.write(bytes_str.c_str(), bytes_str.size());
         return out;
@@ -58,11 +59,11 @@ namespace huffman_archiver
         in.read(reinterpret_cast<char *>(&codes_size), sizeof(codes_size));
         while (codes_size--)
         {
-            uint8_t code_value;
-            in.read(reinterpret_cast<char *>(&code_value), sizeof(code_value));
+            char code_value;
+            in.read(&code_value, sizeof(code_value));
 
-            uint8_t code_size;
-            in.read(reinterpret_cast<char *>(&code_size), sizeof(code_size));
+            char code_size;
+            in.read(&code_size, sizeof(code_size));
 
             std::string code_str(code_size, DEFAULT_CHAR);
             in.read(&code_str[0], code_size);
@@ -71,8 +72,8 @@ namespace huffman_archiver
         archiver._bytes.resize(0);
         while (true)
         {
-            uint8_t byte;
-            in.read(reinterpret_cast<char *>(&byte), sizeof(byte));
+            char byte;
+            in.read(&byte, sizeof(byte));
             if (in.eof() || in.fail())
                 break;
             archiver._bytes.push_back(byte);
