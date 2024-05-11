@@ -1,16 +1,17 @@
-#include "huffman_archiver.h"
 #include "huffman_tree.h"
+#include "huffman_archiver.h"
+#include "huffman_constants.h"
+#include "bin_manip.h"
 #include <queue>
 #include <bitset>
 #include <string>
 #include <algorithm>
+#include <iostream>
+#include <array>
+#include <map>
 
 namespace huffman_archiver
 {
-    const char ON = '1';
-    const char OFF = '0';
-    const std::size_t BYTE_LEN = 8;
-
     huffman_archiver::huffman_archiver(std::string text) : _bytes(std::vector<uint8_t>(text.begin(), text.end())), _tree(nullptr), _bytes_size(text.size()) {}
 
     std::string huffman_archiver::get_bytes()
@@ -23,57 +24,41 @@ namespace huffman_archiver
         return _bytes.size();
     }
 
-    std::size_t huffman_archiver::get_amount_of_codes_bytes() const
+    std::size_t huffman_archiver::get_amount_of_additional_bytes() const
     {
-        std::size_t bytes = 0;
-        for (auto &code_pair : _codes)
-        {
-            bytes += code_pair.second.size() + 2;
-        }
-        return bytes;
+        return _freqs.size() * (sizeof(std::size_t) + sizeof(uint8_t)) + sizeof(_bytes_size) + sizeof(uint16_t);
     }
 
     std::ofstream &operator<<(std::ofstream &out, huffman_archiver &archiver)
     {
-        out.write(reinterpret_cast<char *>(&archiver._bytes_size), sizeof(archiver._bytes_size));
-        uint8_t codes_size = archiver._codes.size();
-        out.write(reinterpret_cast<char *>(&codes_size), sizeof(codes_size));
-        std::for_each(archiver._codes.begin(), archiver._codes.end(), [&](auto &code)
+        print(out, archiver._bytes_size);
+        print<uint16_t>(out, archiver._freqs.size());
+        std::for_each(archiver._freqs.begin(), archiver._freqs.end(), [&](auto &freq)
                       {
-            char code_value = code.first;
-            out.write(&code_value, sizeof(code_value));
-
-            char code_size = code.second.size();
-            out.write(&code_size, sizeof(code_size));
-            out.write(code.second.c_str(), code_size); });
-
-        std::string bytes_str = archiver.get_bytes();
-        out.write(bytes_str.c_str(), bytes_str.size());
+            print(out, freq.first);
+            print(out, freq.second); });
+        print(out, archiver.get_bytes());
         return out;
     }
 
     std::ifstream &operator>>(std::ifstream &in, huffman_archiver &archiver)
     {
-        in.read(reinterpret_cast<char *>(&archiver._bytes_size), sizeof(archiver._bytes_size));
-        uint8_t codes_size;
-        in.read(reinterpret_cast<char *>(&codes_size), sizeof(codes_size));
-        while (codes_size--)
+        input(in, archiver._bytes_size);
+        uint16_t freqs_size = 0;
+        input(in, freqs_size);
+        while (freqs_size--)
         {
-            char code_value;
-            in.read(&code_value, sizeof(code_value));
-
-            char code_size;
-            in.read(&code_size, sizeof(code_size));
-
-            std::string code_str(code_size, DEFAULT_CHAR);
-            in.read(&code_str[0], code_size);
-            archiver._codes[code_value] = code_str;
+            uint8_t freq_key = 0;
+            input(in, freq_key);
+            std::size_t freq_value = 0;
+            input(in, freq_value);
+            archiver._freqs[freq_key] = freq_value;
         }
         archiver._bytes.resize(0);
         while (true)
         {
-            char byte;
-            in.read(&byte, sizeof(byte));
+            uint8_t byte;
+            input(in, byte);
             if (in.eof() || in.fail())
                 break;
             archiver._bytes.push_back(byte);
@@ -81,54 +66,79 @@ namespace huffman_archiver
         return in;
     }
 
+    void huffman_archiver::calc_freqs(std::map<uint8_t, std::size_t> &freqs)
+    {
+        for (uint8_t byte : _bytes)
+            ++freqs[byte];
+    }
+
     void huffman_archiver::archive()
     {
-        _tree = huffman_tree::build_tree(_bytes);
+        if (_bytes.empty())
+            return;
+
+        std::map<uint8_t, std::size_t> freqs;
+        calc_freqs(freqs);
+        _freqs = freqs;
+
+        _tree = huffman_tree::build_tree(freqs);
         _codes = _tree->get_codes();
-        std::bitset<BYTE_LEN> cur_byte;
+
+        std::bitset<huffman_constants::BYTE_LEN> cur_byte;
         std::vector<uint8_t> bytes;
         std::size_t cur_byte_index = 0;
+
         for (std::size_t i = 0; i < _bytes.size(); ++i)
         {
             auto code = _codes[_bytes[i]];
-            for (std::size_t j = 0; j < code.size(); ++j)
+            for (const char &bit : code)
             {
-                if (cur_byte_index % BYTE_LEN == 0 && cur_byte_index > 0)
+                if (cur_byte_index == huffman_constants::BYTE_LEN)
                 {
-                    bytes.push_back(static_cast<uint8_t>(cur_byte.to_ulong()));
-                    cur_byte_index = 0;
+                    bytes.push_back(cur_byte.to_ulong());
                     cur_byte.reset();
+                    cur_byte_index = 0;
                 }
-                cur_byte.set(cur_byte_index++, code[j] == ON);
+                cur_byte.set(cur_byte_index++, bit == huffman_constants::BIT_ON);
             }
         }
+
         if (cur_byte_index > 0)
-            bytes.push_back(static_cast<uint8_t>(cur_byte.to_ulong()));
-        delete _tree;
+            bytes.push_back(cur_byte.to_ulong());
         _bytes = bytes;
     }
 
     void huffman_archiver::unarchive()
     {
-        std::unordered_map<std::string, uint8_t> codes;
+        _tree = huffman_tree::build_tree(_freqs);
         std::vector<uint8_t> bytes;
-        for (auto &code_pair : _codes)
-            codes[code_pair.second] = code_pair.first;
+        if (_tree == nullptr)
+        {
+            _bytes = {};
+            return;
+        }
+        _tree->reset_cur();
 
-        std::string code;
+        if (_tree->get_size() == 1)
+        {
+            _bytes = {};
+            for (std::size_t i = 0; i < _bytes_size; ++i)
+                _bytes.push_back(_tree->get_byte_of_cur().second);
+            return;
+        }
+
         for (std::size_t i = 0; i < _bytes.size(); ++i)
         {
-            for (std::size_t j = 0; j < BYTE_LEN; ++j)
+            for (std::size_t j = 0; j < huffman_constants::BYTE_LEN; ++j)
             {
                 if (_bytes[i] & (1 << j))
-                    code.push_back(ON);
+                    _tree->go_right();
                 else
-                    code.push_back(OFF);
-
-                if (codes.find(code) != codes.end())
+                    _tree->go_left();
+                if (_tree->get_byte_of_cur().first)
                 {
-                    bytes.push_back(codes[code]);
-                    code.clear();
+                    bytes.push_back(_tree->get_byte_of_cur().second);
+                    _tree->reset_cur();
                 }
             }
         }

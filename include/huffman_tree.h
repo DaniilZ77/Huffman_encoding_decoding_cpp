@@ -1,30 +1,32 @@
 #pragma once
 
 #include "huffman_tree_node.h"
+#include <map>
 #include <unordered_map>
 #include <string>
 #include <memory>
+#include <utility>
 
 namespace huffman_archiver
 {
-    extern char DEFAULT_CHAR;
-
     class huffman_tree
     {
     private:
-        huffman_tree_node *_head;
+        std::shared_ptr<huffman_tree_node> _head;
+        std::shared_ptr<huffman_tree_node> _cur;
         std::size_t _size;
 
     public:
-        huffman_tree(huffman_tree_node *head, std::size_t size);
+        huffman_tree(std::shared_ptr<huffman_tree_node> head, std::size_t size);
         std::unordered_map<uint8_t, std::string> get_codes();
-        ~huffman_tree();
         std::size_t get_size() const;
-        const huffman_tree_node *get_head() const;
-        static huffman_tree *build_tree(std::vector<uint8_t> &bytes);
+        static std::shared_ptr<huffman_tree> build_tree(std::map<uint8_t, std::size_t> &freqs);
+        void go_left();
+        void go_right();
+        std::pair<bool, uint8_t> get_byte_of_cur();
+        void reset_cur();
 
     private:
-        void get_codes_helper(const huffman_tree_node *cur, std::unordered_map<uint8_t, std::string> &codes, std::string code);
-        void clear_tree(huffman_tree_node *cur);
+        void get_codes_helper(const std::shared_ptr<huffman_tree_node> cur, std::unordered_map<uint8_t, std::string> &codes, std::string code);
     };
 }
